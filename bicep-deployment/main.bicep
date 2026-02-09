@@ -6,8 +6,8 @@ param publisherEmail string
 @description('Publisher name for APIM')
 param publisherName string
 
-@description('Name of the existing Application Insights logger in APIM')
-param appInsightsLoggerName string
+@description('Name of the Application Insights instance')
+param appInsightsName string
 
 @description('Headers to log in APIM diagnostics (backend request)')
 param headersToLog array = []
@@ -32,10 +32,29 @@ resource apiManagementInstance 'Microsoft.ApiManagement/service@2022-08-01' = {
   }
 }
 
-// Reference existing Application Insights logger
-resource apimLogger 'Microsoft.ApiManagement/service/loggers@2020-12-01' existing = {
+// Application Insights instance
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: appInsightsName
+  location: resourceGroup().location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    publicNetworkAccessForIngestion: 'Enabled'
+    publicNetworkAccessForQuery: 'Enabled'
+  }
+}
+
+// APIM Logger for Application Insights
+resource apimLogger 'Microsoft.ApiManagement/service/loggers@2022-08-01' = {
   parent: apiManagementInstance
-  name: appInsightsLoggerName
+  name: appInsightsName
+  properties: {
+    loggerType: 'applicationInsights'
+    credentials: {
+      instrumentationKey: appInsights.properties.InstrumentationKey
+    }
+    resourceId: appInsights.id
+  }
 }
 
 // Application Insights diagnostics

@@ -3,7 +3,7 @@ using 'main.bicep'
 param apimName = 'apim-nepeters-prd'
 param publisherEmail = 'admin@contoso.com'
 param publisherName = 'Contoso'
-param appInsightsLoggerName = 'ins-api-gateway-nepeters'
+param appInsightsName = 'appi-nepeters-prd'
 param storageAccountName = 'nepetersstorprd'
 param keyVaultName = 'kv-nepeters-prd'
 
