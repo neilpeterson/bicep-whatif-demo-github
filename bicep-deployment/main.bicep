@@ -1,5 +1,11 @@
 param apimName string
 
+@description('Publisher email for APIM')
+param publisherEmail string
+
+@description('Publisher name for APIM')
+param publisherName string
+
 @description('Name of the existing Application Insights logger in APIM')
 param appInsightsLoggerName string
 
@@ -9,8 +15,21 @@ param headersToLog array = []
 @description('Name of the storage account')
 param storageAccountName string
 
-resource apiManagementInstance 'Microsoft.ApiManagement/service@2022-08-01' existing = {
+@description('Name of the Key Vault')
+param keyVaultName string
+
+resource apiManagementInstance 'Microsoft.ApiManagement/service@2022-08-01' = {
   name: apimName
+  location: resourceGroup().location
+  sku: {
+    name: 'Developer'
+    capacity: 1
+  }
+  properties: {
+    publisherEmail: publisherEmail
+    publisherName: publisherName
+    virtualNetworkType: 'External'
+  }
 }
 
 // Reference existing Application Insights logger
@@ -62,3 +81,25 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2025-01-01' = {
     publicNetworkAccess: 'Disabled'
   }
 }
+
+resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
+  name: keyVaultName
+  location: resourceGroup().location
+  properties: {
+    tenantId: subscription().tenantId
+    sku: {
+      family: 'A'
+      name: 'standard'
+    }
+    enableRbacAuthorization: true
+    enableSoftDelete: true
+    softDeleteRetentionInDays: 90
+    publicNetworkAccess: 'Disabled'
+    networkAcls: {
+      defaultAction: 'Deny'
+      bypass: 'AzureServices'
+    }
+  }
+}
+
+

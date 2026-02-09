@@ -1,8 +1,11 @@
 using 'main.bicep'
 
-param apimName = 'apim-nepeters-vs'
+param apimName = 'apim-nepeters-prd'
+param publisherEmail = 'admin@contoso.com'
+param publisherName = 'Contoso'
 param appInsightsLoggerName = 'ins-api-gateway-nepeters'
 param storageAccountName = 'nepetersstorprd'
+param keyVaultName = 'kv-nepeters-prd'
 
 // Headers to log in APIM diagnostics
 param headersToLog = [
