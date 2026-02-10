@@ -42,6 +42,19 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2024-01-01' = {
   properties: {
     securityRules: [
       {
+        name: 'AllowHttpsFromTrustedIPRange'
+        properties: {
+          priority: 100
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: '*'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '443'
+        }
+      }
+      {
         name: 'AllowHttpsFromTrustedIP'
         properties: {
           priority: 100
@@ -127,6 +140,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
     allowBlobPublicAccess: false
     accessTier: 'Hot'
     publicNetworkAccess: 'Disabled'
+    allowSharedKeyAccess: false
     networkAcls: {
       defaultAction: networkAclsDefaultAction
       bypass: 'AzureServices'
