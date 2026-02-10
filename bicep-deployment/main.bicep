@@ -1,90 +1,98 @@
-param apimName string
-
-@description('Publisher email for APIM')
-param publisherEmail string
-
-@description('Publisher name for APIM')
-param publisherName string
-
-@description('Name of the Application Insights instance')
-param appInsightsName string
-
-@description('Headers to log in APIM diagnostics (backend request)')
-param headersToLog array = []
-
 @description('Name of the storage account')
 param storageAccountName string
 
 @description('Name of the Key Vault')
 param keyVaultName string
 
-resource apiManagementInstance 'Microsoft.ApiManagement/service@2022-08-01' = {
-  name: apimName
+@description('Name of the Virtual Network')
+param vnetName string
+
+@description('Name of the Log Analytics workspace')
+param logAnalyticsName string
+
+@description('Address prefix for the VNet')
+param vnetAddressPrefix string = '10.0.0.0/16'
+
+@description('Address prefix for the private endpoint subnet')
+param privateEndpointSubnetPrefix string = '10.0.1.0/24'
+
+// Log Analytics Workspace
+resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+  name: logAnalyticsName
   location: resourceGroup().location
-  sku: {
-    name: 'Developer'
-    capacity: 1
-  }
   properties: {
-    publisherEmail: publisherEmail
-    publisherName: publisherName
-    virtualNetworkType: 'None'
+    sku: {
+      name: 'PerGB2018'
+    }
+    retentionInDays: 30
   }
 }
 
-// Application Insights instance
-resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
-  name: appInsightsName
+// Network Security Group - Block all external traffic
+resource nsg 'Microsoft.Network/networkSecurityGroups@2024-01-01' = {
+  name: '${vnetName}-nsg'
   location: resourceGroup().location
-  kind: 'web'
   properties: {
-    Application_Type: 'web'
-    publicNetworkAccessForIngestion: 'Enabled'
-    publicNetworkAccessForQuery: 'Enabled'
+    securityRules: [
+      {
+        name: 'DenyAllInbound'
+        properties: {
+          priority: 4096
+          direction: 'Inbound'
+          access: 'Deny'
+          protocol: '*'
+          sourceAddressPrefix: 'Internet'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '*'
+        }
+      }
+      {
+        name: 'DenyAllOutbound'
+        properties: {
+          priority: 4096
+          direction: 'Outbound'
+          access: 'Deny'
+          protocol: '*'
+          sourceAddressPrefix: '*'
+          sourcePortRange: '*'
+          destinationAddressPrefix: 'Internet'
+          destinationPortRange: '*'
+        }
+      }
+    ]
   }
 }
 
-// APIM Logger for Application Insights
-resource apimLogger 'Microsoft.ApiManagement/service/loggers@2022-08-01' = {
-  parent: apiManagementInstance
-  name: appInsightsName
+// Virtual Network
+resource vnet 'Microsoft.Network/virtualNetworks@2024-01-01' = {
+  name: vnetName
+  location: resourceGroup().location
   properties: {
-    loggerType: 'applicationInsights'
-    credentials: {
-      instrumentationKey: appInsights.properties.InstrumentationKey
+    addressSpace: {
+      addressPrefixes: [
+        vnetAddressPrefix
+      ]
     }
-    resourceId: appInsights.id
+    subnets: [
+      {
+        name: 'private-endpoints'
+        properties: {
+          addressPrefix: privateEndpointSubnetPrefix
+          networkSecurityGroup: {
+            id: nsg.id
+          }
+          privateEndpointNetworkPolicies: 'Disabled'
+        }
+      }
+    ]
   }
 }
 
-// Application Insights diagnostics
-resource apimDiagnosticsAppInsights 'Microsoft.ApiManagement/service/diagnostics@2023-03-01-preview' = {
-  parent: apiManagementInstance
-  name: 'applicationinsights'
-  properties: {
-    alwaysLog: 'allErrors'
-    httpCorrelationProtocol: 'Legacy'
-    verbosity: 'information'
-    logClientIp: true
-    loggerId: apimLogger.id
-    sampling: {
-      samplingType: 'fixed'
-      percentage: 100
-    }
-    frontend: {
-      request: { headers: headersToLog, body: { bytes: 0 } }
-      response: { headers: headersToLog, body: { bytes: 0 } }
-    }
-    backend: {
-      request: { headers: headersToLog, body: { bytes: 0 } }
-      response: { headers: headersToLog, body: { bytes: 0 } }
-    }
-  }
-}
-
-resource storageAccount 'Microsoft.Storage/storageAccounts@2025-01-01' = {
+// Storage Account
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
-  location: 'centralus'
+  location: resourceGroup().location
   sku: {
     name: 'Standard_LRS'
   }
@@ -98,9 +106,20 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2025-01-01' = {
     allowBlobPublicAccess: false
     accessTier: 'Hot'
     publicNetworkAccess: 'Disabled'
+    networkAcls: {
+      defaultAction: 'Deny'
+      bypass: 'AzureServices'
+    }
   }
 }
 
+// Blob Service (for diagnostics scope)
+resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
+// Key Vault
 resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   name: keyVaultName
   location: resourceGroup().location
@@ -118,6 +137,188 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
       defaultAction: 'Deny'
       bypass: 'AzureServices'
     }
+  }
+}
+
+// Private DNS Zone for Storage Blob
+resource storageDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: 'privatelink.blob.${environment().suffixes.storage}'
+  location: 'global'
+}
+
+// Private DNS Zone for Key Vault
+resource keyVaultDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: 'privatelink.vaultcore.azure.net'
+  location: 'global'
+}
+
+// Link DNS Zones to VNet
+resource storageDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: storageDnsZone
+  name: '${vnetName}-storage-link'
+  location: 'global'
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: {
+      id: vnet.id
+    }
+  }
+}
+
+resource keyVaultDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: keyVaultDnsZone
+  name: '${vnetName}-keyvault-link'
+  location: 'global'
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: {
+      id: vnet.id
+    }
+  }
+}
+
+// Private Endpoint for Storage Account
+resource storagePrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+  name: '${storageAccountName}-pe'
+  location: resourceGroup().location
+  properties: {
+    subnet: {
+      id: vnet.properties.subnets[0].id
+    }
+    privateLinkServiceConnections: [
+      {
+        name: '${storageAccountName}-connection'
+        properties: {
+          privateLinkServiceId: storageAccount.id
+          groupIds: [
+            'blob'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+// Private Endpoint for Key Vault
+resource keyVaultPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+  name: '${keyVaultName}-pe'
+  location: resourceGroup().location
+  properties: {
+    subnet: {
+      id: vnet.properties.subnets[0].id
+    }
+    privateLinkServiceConnections: [
+      {
+        name: '${keyVaultName}-connection'
+        properties: {
+          privateLinkServiceId: keyVault.id
+          groupIds: [
+            'vault'
+          ]
+        }
+      }
+    ]
+  }
+}
+
+// DNS Zone Group for Storage Private Endpoint
+resource storageDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01' = {
+  parent: storagePrivateEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'storage-config'
+        properties: {
+          privateDnsZoneId: storageDnsZone.id
+        }
+      }
+    ]
+  }
+}
+
+// DNS Zone Group for Key Vault Private Endpoint
+resource keyVaultDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01' = {
+  parent: keyVaultPrivateEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'keyvault-config'
+        properties: {
+          privateDnsZoneId: keyVaultDnsZone.id
+        }
+      }
+    ]
+  }
+}
+
+// Storage Account Diagnostics
+resource storageAccountDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: '${storageAccountName}-diagnostics'
+  scope: storageAccount
+  properties: {
+    workspaceId: logAnalytics.id
+    metrics: [
+      {
+        category: 'Transaction'
+        enabled: true
+      }
+    ]
+  }
+}
+
+// Storage Blob Diagnostics
+resource storageBlobDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: '${storageAccountName}-blob-diagnostics'
+  scope: blobService
+  properties: {
+    workspaceId: logAnalytics.id
+    logs: [
+      {
+        category: 'StorageRead'
+        enabled: true
+      }
+      {
+        category: 'StorageWrite'
+        enabled: true
+      }
+      {
+        category: 'StorageDelete'
+        enabled: true
+      }
+    ]
+    metrics: [
+      {
+        category: 'Transaction'
+        enabled: true
+      }
+    ]
+  }
+}
+
+// Key Vault Diagnostics
+resource keyVaultDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: '${keyVaultName}-diagnostics'
+  scope: keyVault
+  properties: {
+    workspaceId: logAnalytics.id
+    logs: [
+      {
+        category: 'AuditEvent'
+        enabled: true
+      }
+      {
+        category: 'AzurePolicyEvaluationDetails'
+        enabled: true
+      }
+    ]
+    metrics: [
+      {
+        category: 'AllMetrics'
+        enabled: true
+      }
+    ]
   }
 }
 
