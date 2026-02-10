@@ -16,6 +16,13 @@ param vnetAddressPrefix string = '10.0.0.0/16'
 @description('Address prefix for the private endpoint subnet')
 param privateEndpointSubnetPrefix string = '10.0.1.0/24'
 
+@description('Default action for network ACLs (Allow or Deny)')
+@allowed([
+  'Allow'
+  'Deny'
+])
+param networkAclsDefaultAction string = 'Deny'
+
 // Log Analytics Workspace
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: logAnalyticsName
@@ -34,6 +41,32 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2024-01-01' = {
   location: resourceGroup().location
   properties: {
     securityRules: [
+      {
+        name: 'AllowHttpsFromTrustedIP'
+        properties: {
+          priority: 100
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: '74.19.4.32'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '443'
+        }
+      }
+      {
+        name: 'AllowHttpsFromTrustedIPRange'
+        properties: {
+          priority: 120
+          direction: 'Inbound'
+          access: 'Allow'
+          protocol: 'Tcp'
+          sourceAddressPrefix: '74.19.5.32'
+          sourcePortRange: '*'
+          destinationAddressPrefix: '*'
+          destinationPortRange: '443'
+        }
+      }
       {
         name: 'DenyAllInbound'
         properties: {
@@ -100,14 +133,16 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   tags: {
     Environment: 'Production'
     ManagedBy: 'Bicep'
+    CostCenter: 'Engineering'
   }
   properties: {
     minimumTlsVersion: 'TLS1_2'
     allowBlobPublicAccess: false
     accessTier: 'Hot'
     publicNetworkAccess: 'Disabled'
+    allowSharedKeyAccess: false
     networkAcls: {
-      defaultAction: 'Deny'
+      defaultAction: networkAclsDefaultAction
       bypass: 'AzureServices'
     }
   }
@@ -134,7 +169,7 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     softDeleteRetentionInDays: 90
     publicNetworkAccess: 'Disabled'
     networkAcls: {
-      defaultAction: 'Deny'
+      defaultAction: networkAclsDefaultAction
       bypass: 'AzureServices'
     }
   }
