@@ -120,6 +120,7 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   tags: {
     Environment: 'Production'
     ManagedBy: 'Bicep'
+    CostCenter: 'Engineering'
   }
   properties: {
     minimumTlsVersion: 'TLS1_2'
