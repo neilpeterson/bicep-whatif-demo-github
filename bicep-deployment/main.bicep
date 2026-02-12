@@ -72,7 +72,7 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2024-01-01' = {
       {
         name: 'AllowHttpsFromTrustedIPMexico'
         properties: {
-          priority: 120
+          priority: 130
           direction: 'Inbound'
           access: 'Allow'
           protocol: 'Tcp'
