@@ -74,7 +74,8 @@ stages:
                   | bicep-whatif-advisor --no-block --comment-title "$(ENVIRONMENT_NAME) What-If Summary" --bicep-dir bicep-deployment/
             env:
               ANTHROPIC_API_KEY: $(ANTHROPIC_API_KEY)
-              SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+              GITHUB_TOKEN: $(GITHUB_TOKEN)
+              # SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
   # Validate Stage - runs what-if analysis on push to main
   - stage: Validate
@@ -126,6 +127,7 @@ stages:
                 cat $(Agent.TempDirectory)/whatif-output.md
             env:
               ANTHROPIC_API_KEY: $(ANTHROPIC_API_KEY)
+              GITHUB_TOKEN: $(GITHUB_TOKEN)
 
           - task: PublishBuildArtifacts@1
             displayName: 'Publish What-If Results'
