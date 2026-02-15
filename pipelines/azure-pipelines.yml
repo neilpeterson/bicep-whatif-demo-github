@@ -71,7 +71,7 @@ stages:
                   --template-file "$(BICEP_TEMPLATE)" \
                   --parameters "$(BICEP_PARAMS)" \
                   --exclude-change-types NoChange Ignore \
-                  | bicep-whatif-advisor --no-block --comment-title "$(ENVIRONMENT_NAME) What-If Summary" --bicep-dir bicep-deployment/
+                  | bicep-whatif-advisor --no-block --comment-title "$(ENVIRONMENT_NAME) What-If Summary" --noise-file bicep-deployment/.whatif-noise --bicep-dir bicep-deployment/
             env:
               ANTHROPIC_API_KEY: $(ANTHROPIC_API_KEY)
               GITHUB_TOKEN: $(GITHUB_TOKEN)
