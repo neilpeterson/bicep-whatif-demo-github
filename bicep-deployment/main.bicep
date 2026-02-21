@@ -1,3 +1,5 @@
+// trigger
+
 @description('Name of the Virtual Network')
 param vnetName string
 
