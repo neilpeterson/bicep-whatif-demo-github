@@ -132,3 +132,4 @@ virtualNetworkLinks
 
 resource: privateDnsZones/virtualNetworkLinks:Modify
 resource: Microsoft.Insights/diagnosticSettings:Modify
+resource: Microsoft.Storage/storageAccounts/blobServices:Modify
