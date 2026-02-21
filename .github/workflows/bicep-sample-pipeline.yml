@@ -89,6 +89,7 @@ jobs:
             --exclude-change-types NoChange Ignore \
           | bicep-whatif-advisor \
             --no-block \
+            --include-whatif \
             --comment-title "${{ matrix.environment.name }} What-If Summary" \
             --bicep-dir "${{ env.BICEP_DIR }}" \
             --noise-file "${{ env.NOISE_FILE }}"
