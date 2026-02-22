@@ -91,7 +91,8 @@ jobs:
             --no-block \
             --comment-title "${{ matrix.environment.name }} What-If Summary" \
             --bicep-dir "${{ env.BICEP_DIR }}" \
-            --noise-file "${{ env.NOISE_FILE }}"
+            --noise-file "${{ env.NOISE_FILE }}" \
+            --include-whatif
 
   # ---------------------------------------------------
   # Validate – What-If + summary on push / dispatch
