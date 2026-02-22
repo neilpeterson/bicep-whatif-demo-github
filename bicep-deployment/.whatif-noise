@@ -133,5 +133,4 @@ fuzzy: System-managed property changing
 resource: privateDnsZones/virtualNetworkLinks:Modify
 resource: Microsoft.Insights/diagnosticSettings:Modify
 resource: Microsoft.Storage/storageAccounts/blobServices:Modify
-resource: stgprdparisbranch/blobServices/default:Modify
 resource: Microsoft.Network/privateEndpoints:Modify
